@@ -85,6 +85,7 @@ export function useMultiplayerState(roomId) {
 
   const onChangePresence = useCallback((app, user) => {
     awareness.setLocalStateField("tdUser", user);
+    console.log(awareness);
   }, []);
 
   useEffect(() => {
