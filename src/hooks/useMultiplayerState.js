@@ -1,19 +1,17 @@
-import { TDBinding, TDShape, TDUser, TldrawApp } from "@tldraw/tldraw";
+import { TDUser, TldrawApp } from "@tldraw/tldraw";
 import { useCallback, useEffect, useRef } from "react";
-import {
-  awareness,
-  doc,
-  provider,
-  undoManager,
-  yBindings,
-  yShapes
-} from "../store";
+import throttle from "lodash.throttle";
 
-export function useMultiplayerState(roomId: string) {
-  const tldrawRef = useRef<TldrawApp>();
+import { store } from "../store";
+
+export function useMultiplayerState(roomId) {
+  const { awareness, doc, provider, undoManager, yBindings, yShapes } =
+    store(1);
+
+  const tldrawRef = useRef();
 
   const onMount = useCallback(
-    (app: TldrawApp) => {
+    (app) => {
       app.loadRoom(roomId);
       app.pause();
       tldrawRef.current = app;
@@ -27,30 +25,50 @@ export function useMultiplayerState(roomId: string) {
     [roomId]
   );
 
-  const onChangePage = useCallback(
-    (
-      app: TldrawApp,
-      shapes: Record<string, TDShape | undefined>,
-      bindings: Record<string, TDBinding | undefined>
-    ) => {
-      undoManager.stopCapturing();
+  const onChange = useCallback(
+    throttle((app, reason) => {
+      if (
+        reason &&
+        reason.includes("user") &&
+        !reason.includes("session") &&
+        !reason.includes("delete")
+      ) {
+        return;
+      }
+
+      const shapes = app.shapes;
+      const bindings = app.bindings;
+
       doc.transact(() => {
-        Object.entries(shapes).forEach(([id, shape]) => {
+        shapes.forEach((shape) => {
           if (!shape) {
-            yShapes.delete(id);
+            // shape is falsy, so we cannot access its id property
+            // do something else here, or simply return
+            console.error("Shape is undefined or of type never");
+            return;
           } else {
             yShapes.set(shape.id, shape);
           }
         });
-        Object.entries(bindings).forEach(([id, binding]) => {
-          if (!binding) {
-            yBindings.delete(id);
+        bindings.forEach((binding) => {
+          if (!binding || typeof binding === "undefined") {
           } else {
             yBindings.set(binding.id, binding);
           }
         });
+      }, tldrawRef.current);
+
+      const keys = shapes.reduce((keys, shape) => {
+        keys.add(shape.id);
+        return keys;
+      }, new Set());
+
+      Array.from(yShapes.keys()).forEach((id) => {
+        if (!keys.has(id)) {
+          yShapes.delete(id);
+        }
       });
-    },
+    }, 50),
     []
   );
 
@@ -62,18 +80,12 @@ export function useMultiplayerState(roomId: string) {
     undoManager.redo();
   }, []);
 
-  /**
-   * Callback to update user's (self) presence
-   */
-  const onChangePresence = useCallback((app: TldrawApp, user: TDUser) => {
+  const onChangePresence = useCallback((app, user) => {
     awareness.setLocalStateField("tdUser", user);
   }, []);
 
-  /**
-   * Update app users whenever there is a change in the room users
-   */
   useEffect(() => {
-    const onChangeAwareness = () => {
+    const onChangeAwareness = throttle(() => {
       const tldraw = tldrawRef.current;
 
       if (!tldraw || !tldraw.room) return;
@@ -83,7 +95,7 @@ export function useMultiplayerState(roomId: string) {
         .map(([_, state]) => state)
         .filter((user) => user.tdUser !== undefined);
 
-      const ids = others.map((other) => other.tdUser.id as string);
+      const ids = others.map((other) => other.tdUser.id);
 
       Object.values(tldraw.room.users).forEach((user) => {
         if (user && !ids.includes(user.id) && user.id !== tldraw.room?.userId) {
@@ -92,7 +104,7 @@ export function useMultiplayerState(roomId: string) {
       });
 
       tldraw.updateUsers(others.map((other) => other.tdUser).filter(Boolean));
-    };
+    }, 50);
 
     awareness.on("change", onChangeAwareness);
 
@@ -100,17 +112,17 @@ export function useMultiplayerState(roomId: string) {
   }, []);
 
   useEffect(() => {
-    function handleChanges() {
+    const handleChanges = throttle((event) => {
       const tldraw = tldrawRef.current;
 
-      if (!tldraw) return;
+      if (!tldraw || event.origin === tldraw) return;
 
       tldraw.replacePageContent(
         Object.fromEntries(yShapes.entries()),
         Object.fromEntries(yBindings.entries()),
         {}
       );
-    }
+    }, 25);
 
     yShapes.observeDeep(handleChanges);
 
@@ -128,9 +140,9 @@ export function useMultiplayerState(roomId: string) {
 
   return {
     onMount,
-    onChangePage,
+    onChange,
     onUndo,
     onRedo,
-    onChangePresence
+    onChangePresence,
   };
 }
