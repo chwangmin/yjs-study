@@ -1,13 +1,16 @@
 import { TDUser, TldrawApp } from "@tldraw/tldraw";
 import { useCallback, useEffect, useRef } from "react";
 import throttle from "lodash.throttle";
-
-import { store } from "../store";
+import {
+  awareness,
+  doc,
+  provider,
+  undoManager,
+  yBindings,
+  yShapes,
+} from "../store";
 
 export function useMultiplayerState(roomId) {
-  const { awareness, doc, provider, undoManager, yBindings, yShapes } =
-    store(1);
-
   const tldrawRef = useRef();
 
   const onMount = useCallback(
