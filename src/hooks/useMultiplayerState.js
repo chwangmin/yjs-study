@@ -3,31 +3,39 @@ import throttle from "lodash.throttle";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 
+let doc = new Y.Doc();
+
 let provider;
 
-export function useMultiplayerState(roomId, app2) {
-  let doc = new Y.Doc();
+let awarenessObservers;
+
+export function useMultiplayerState(roomId) {
   if (provider) {
     provider.disconnect();
   }
   console.log("111111111");
   console.log(roomId);
 
-  provider = new WebsocketProvider(
-    "ws://ec2-3-37-28-211.ap-northeast-2.compute.amazonaws.com:3000",
-    roomId,
-    doc,
-    {
-      connect: true,
-    }
-  );
-  console.log(doc);
-
+  provider = new WebsocketProvider("ws://localhost:1234", roomId, doc, {
+    connect: true,
+  });
   provider.connect();
+  console.log(doc);
 
   console.log(provider);
 
   let awareness = provider.awareness;
+
+  if (!awarenessObservers) {
+    awarenessObservers = awareness._observers;
+  } else {
+    awareness._observers = awarenessObservers;
+  }
+
+  console.log(awareness);
+
+  console.log("size check~~~~~", awareness._observers);
+  console.log(awarenessObservers);
 
   let yShapes = doc.getMap("shapes");
   let yBindings = doc.getMap("binding");
@@ -127,6 +135,7 @@ export function useMultiplayerState(roomId, app2) {
           tldraw.removeUser(user.id);
         }
       });
+      console.log("plz~~~~~~", others); // 이부분이 안뜸
 
       tldraw.updateUsers(others.map((other) => other.tdUser).filter(Boolean));
     }, 50);

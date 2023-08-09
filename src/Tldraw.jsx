@@ -2,56 +2,28 @@ import { Tldraw, useFileSystem } from "@tldraw/tldraw";
 import { useUsers } from "y-presence";
 import { useMultiplayerState } from "./hooks/useMultiplayerState";
 import "./styles.css";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 function Editor({ roomId }) {
   console.log("Editor gogogogogogogo");
   const fileSystemEvents = useFileSystem();
-  const { onMount, onChange, onUndo, onRedo, onChangePresence } =
-    useMultiplayerState(roomId);
+  const { onMount, ...events } = useMultiplayerState(roomId);
 
   const appRef = useRef(null);
-  let reson2;
-  let user2;
 
-  useEffect(() => {
-    if (appRef.current) {
-      console.log("alsdfkj;aljf;adksj;flksaj;fdlkj");
-      handleMount(appRef.current);
-      handleChange(appRef.current, reson2);
-      handleUndo();
-      handleRedo();
-      handleChangePresence(appRef.current, user2);
-    }
-  });
+  if (appRef.currrent) {
+    appRef.current.reset();
+  }
 
   const handleMount = (app) => {
     appRef.current = app;
     console.log("!1111111111111111111111", app);
     onMount(app); // Call the original onMount function
-    //appRef.current.reset();
-  };
-
-  const handleChange = (app, reson) => {
-    reson2 = reson;
-    onChange(app, reson);
-  };
-
-  const handleUndo = () => {
-    onUndo();
-  };
-
-  const handleRedo = () => {
-    onRedo();
-  };
-
-  const handleChangePresence = (app, user) => {
-    user2 = user;
-    onChangePresence(app, user);
+    console.log(appRef.current.value);
   };
 
   return (
-    <div id="11111">
+    <div key={roomId}>
       <Tldraw
         showMenu={false}
         showZoom={false}
@@ -60,10 +32,7 @@ function Editor({ roomId }) {
         showPages={false}
         onMount={handleMount} // 여기서 onMount 함수를 호출하며 app 인자를 전달합니다.
         {...fileSystemEvents}
-        onChange={handleChange}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onChangePresence={handleChangePresence}
+        {...events}
       />
     </div>
   );
